@@ -1,0 +1,21 @@
+{
+  "name": "lexlens",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,green \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm run dev --workspace @lexlens/web",
+    "dev:api": "uv run --project apps/api uvicorn app.main:app --reload --port 8010 --app-dir apps/api",
+    "build:web": "npm run build --workspace @lexlens/web"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

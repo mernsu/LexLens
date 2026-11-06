@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# build output
+dist/
+build/
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.uv/
+data/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs & os
+*.log
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
