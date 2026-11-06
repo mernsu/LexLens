@@ -6,6 +6,7 @@
 天然覆盖这种词形差异，也不会因词典缺词导致零结果。
 """
 
+import json
 import os
 import re
 import sqlite3
@@ -37,6 +38,34 @@ CREATE TABLE IF NOT EXISTS statutes (
 CREATE VIRTUAL TABLE IF NOT EXISTS statutes_fts USING fts5(
     law_name,
     article_no,
+    tokens,
+    tokenize = 'unicode61'
+);
+
+CREATE TABLE IF NOT EXISTS judgments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_no TEXT NOT NULL UNIQUE,
+    court TEXT NOT NULL,
+    trial_level TEXT NOT NULL,
+    judgment_date TEXT,
+    cause TEXT,
+    project_type TEXT,
+    dispute_types TEXT NOT NULL DEFAULT '[]',
+    cited_statutes TEXT NOT NULL DEFAULT '[]',
+    holding TEXT NOT NULL,
+    reasoning TEXT,
+    full_text TEXT,
+    source TEXT NOT NULL,
+    source_url TEXT,
+    anonymized INTEGER NOT NULL DEFAULT 1,
+    content_hash TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS judgments_fts USING fts5(
+    case_no,
+    holding,
+    reasoning,
     tokens,
     tokenize = 'unicode61'
 );
@@ -189,4 +218,116 @@ def articles_around(
         """,
         (law_name, article_index - span, article_index + span),
     ).fetchall()
+
+
+def judgment_tokens(record: dict) -> str:
+    """案号、案由、工程类型、争议类型、要旨、本院认为，统一切成二元组。"""
+    parts = [
+        record.get("case_no", ""),
+        record.get("cause") or "",
+        record.get("project_type") or "",
+        " ".join(record.get("dispute_types") or []),
+        record.get("holding") or "",
+        record.get("reasoning") or "",
+    ]
+    return tokenize(" ".join(parts))
+
+
+def upsert_judgment(conn: sqlite3.Connection, record: dict) -> str:
+    """按案号写入，内容未变则跳过。返回 inserted / updated / unchanged。"""
+    existing = conn.execute(
+        "SELECT id, content_hash FROM judgments WHERE case_no = ?",
+        (record["case_no"],),
+    ).fetchone()
+    if existing and existing["content_hash"] == record["content_hash"]:
+        return "unchanged"
+
+    columns = (
+        "case_no", "court", "trial_level", "judgment_date", "cause",
+        "project_type", "dispute_types", "cited_statutes", "holding",
+        "reasoning", "full_text", "source", "source_url", "anonymized",
+        "content_hash", "fetched_at",
+    )
+    values = tuple(
+        json.dumps(record[column], ensure_ascii=False)
+        if column in ("dispute_types", "cited_statutes")
+        else record.get(column)
+        for column in columns
+    )
+
+    if existing:
+        assignments = ", ".join(f"{column} = ?" for column in columns[1:])
+        conn.execute(
+            f"UPDATE judgments SET {assignments} WHERE id = ?", values[1:] + (existing["id"],)
+        )
+        conn.execute("DELETE FROM judgments_fts WHERE rowid = ?", (existing["id"],))
+        row_id, status = existing["id"], "updated"
+    else:
+        placeholders = ", ".join("?" for _ in columns)
+        cursor = conn.execute(
+            f"INSERT INTO judgments ({', '.join(columns)}) VALUES ({placeholders})", values
+        )
+        row_id, status = cursor.lastrowid, "inserted"
+
+    conn.execute(
+        """
+        INSERT INTO judgments_fts (rowid, case_no, holding, reasoning, tokens)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            row_id,
+            record["case_no"],
+            record["holding"],
+            record.get("reasoning") or "",
+            judgment_tokens(record),
+        ),
+    )
+    conn.commit()
+    return status
+
+
+def search_judgments(
+    conn: sqlite3.Connection, query: str, limit: int = 10, offset: int = 0
+) -> tuple[list[sqlite3.Row], int]:
+    """与法条检索同一策略：全词 AND 优先，退到 OR 后按覆盖率重排。"""
+    words = query_tokens(query)
+    if not words:
+        return [], 0
+    sql = """
+        SELECT j.case_no, j.court, j.trial_level, j.judgment_date, j.cause,
+               j.project_type, j.dispute_types, j.cited_statutes, j.holding,
+               j.reasoning, j.source_url, f.tokens AS indexed_tokens,
+               bm25(judgments_fts) AS score
+        FROM judgments_fts f
+        JOIN judgments j ON j.id = f.rowid
+        WHERE judgments_fts MATCH ?
+        ORDER BY score
+        LIMIT ? OFFSET ?
+    """
+    count_sql = "SELECT COUNT(*) FROM judgments_fts WHERE judgments_fts MATCH ?"
+
+    expression = _expression(words, " ")
+    total = conn.execute(count_sql, (expression,)).fetchone()[0]
+    if total:
+        return conn.execute(sql, (expression, limit, offset)).fetchall(), total
+
+    candidates = conn.execute(
+        """
+        SELECT j.case_no, j.court, j.trial_level, j.judgment_date, j.cause,
+               j.project_type, j.dispute_types, j.cited_statutes, j.holding,
+               j.reasoning, j.source_url, f.tokens AS indexed_tokens,
+               bm25(judgments_fts) AS score
+        FROM judgments_fts f
+        JOIN judgments j ON j.id = f.rowid
+        WHERE judgments_fts MATCH ?
+        ORDER BY score
+        LIMIT 500
+        """,
+        (_expression(words, " OR "),),
+    ).fetchall()
+    ranked = sorted(
+        candidates,
+        key=lambda row: (-_coverage(row["indexed_tokens"], words), row["score"]),
+    )
+    return ranked[offset : offset + limit], len(ranked)
 

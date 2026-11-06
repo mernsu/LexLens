@@ -1,3 +1,4 @@
+import json
 import os
 
 from dotenv import load_dotenv
@@ -49,6 +50,26 @@ class ContextItem(BaseModel):
     is_target: bool
 
 
+class JudgmentHit(BaseModel):
+    case_no: str
+    court: str
+    trial_level: str
+    judgment_date: str | None
+    cause: str | None
+    project_type: str | None
+    dispute_types: list[str]
+    cited_statutes: list[str]
+    holding: str
+    reasoning: str | None
+    source_url: str | None
+
+
+class JudgmentSearchResponse(BaseModel):
+    items: list[JudgmentHit]
+    total: int
+    terms: list[str]
+
+
 class LawSource(BaseModel):
     law_name: str
     level: str
@@ -84,6 +105,40 @@ def search_statutes(
                 text=row["text"],
                 source_url=row["source_url"],
                 score=row["score"],
+            )
+            for row in rows
+        ],
+        total=total,
+        terms=db.query_terms(q),
+    )
+
+
+@app.get("/api/judgments/search", response_model=JudgmentSearchResponse)
+def judgment_search(
+    q: str = Query(min_length=1, max_length=200),
+    limit: int = Query(default=10, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+) -> JudgmentSearchResponse:
+    """类案检索，元数据与裁判要旨一并返回。"""
+    conn = db.connect()
+    try:
+        rows, total = db.search_judgments(conn, q, limit, offset)
+    finally:
+        conn.close()
+    return JudgmentSearchResponse(
+        items=[
+            JudgmentHit(
+                case_no=row["case_no"],
+                court=row["court"],
+                trial_level=row["trial_level"],
+                judgment_date=row["judgment_date"],
+                cause=row["cause"],
+                project_type=row["project_type"],
+                dispute_types=json.loads(row["dispute_types"]),
+                cited_statutes=json.loads(row["cited_statutes"]),
+                holding=row["holding"],
+                reasoning=row["reasoning"],
+                source_url=row["source_url"],
             )
             for row in rows
         ],
