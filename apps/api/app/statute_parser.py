@@ -9,6 +9,13 @@ _BREAK_TAG = re.compile(r"</(p|div|h[1-6]|li|tr)|<br\s*/?>", re.I)
 _ANY_TAG = re.compile(r"<[^>]+>")
 _ARTICLE_HEAD = re.compile(r"^第[一二三四五六七八九十百千零]+条")
 _ARTICLE_MARK = re.compile(r"第[一二三四五六七八九十百千零]+条")
+# 页面页脚与导航文字，混进条文正文会污染引用
+_FOOTER_LINE = re.compile(
+    r"^(责任编辑[:：]|扫一扫|相关稿件|链接[:：]|版权所有|京ICP|运维保障|返回|顶部"
+    r"|全国人大全国政协|中华人民共和国司法部|中国人大网|中国政府网|司法部信息中心"
+    r"|主办单位|运行维护单位|网站标识码|网站纠错|打印本页|字号|国务院客户端"
+    r"|电脑版|客户端|小程序|微博|微信|邮箱|注册|登录|退出)"
+)
 
 _DIGITS = {
     "零": 0,
@@ -43,6 +50,8 @@ def html_to_text(raw: str) -> str:
     for line in text.split("\n"):
         line = re.sub(r"[ \t]+", " ", line).strip().strip(">").strip()
         if not line or re.fullmatch(r"[<>/=*\-—·]+", line):
+            continue
+        if _FOOTER_LINE.match(line):
             continue
         lines.append(line)
     return "\n".join(lines)
@@ -93,6 +102,15 @@ def parse_articles(text: str) -> list[Article]:
         elif current_no is not None:
             current_lines.append(line)
     flush()
+    if articles:
+        # 末条正文之后是网页页脚垃圾。法规末条固定为施行日期条款，
+        # 以「施行。」为语义边界截断，比逐条匹配页脚文本可靠。
+        last = articles[-1]
+        lines = last.text.split("\n")
+        for position in range(len(lines) - 1, -1, -1):
+            if "施行。" in lines[position]:
+                last.text = "\n".join(lines[: position + 1])
+                break
     return articles
 
 

@@ -1,0 +1,50 @@
+[
+  {
+    "law_name": "中华人民共和国民法典",
+    "level": "法律",
+    "url": "https://www.court.gov.cn/zixun/xiangqing/233181.html",
+    "effective_date": "2021-01-01",
+    "version": "2020年5月28日通过",
+    "expected_count": 1260
+  },
+  {
+    "law_name": "最高人民法院关于审理建设工程施工合同纠纷案件适用法律问题的解释（一）",
+    "level": "司法解释",
+    "url": "https://www.court.gov.cn/zixun/xiangqing/282111.html",
+    "effective_date": "2021-01-01",
+    "version": "法释〔2020〕25号",
+    "expected_count": 45
+  },
+  {
+    "law_name": "中华人民共和国建筑法",
+    "level": "法律",
+    "url": "http://www.npc.gov.cn/zgrdw/npc/xinwen/2019-05/07/content_2086833.htm",
+    "effective_date": "2019-04-23",
+    "version": "2019年修正",
+    "expected_count": 85
+  },
+  {
+    "law_name": "中华人民共和国招标投标法",
+    "level": "法律",
+    "url": "http://www.npc.gov.cn/npc/c2/c30834/201905/t20190521_279157.html",
+    "effective_date": "2000-01-01",
+    "version": "2017年修正",
+    "expected_count": 68
+  },
+  {
+    "law_name": "中华人民共和国招标投标法实施条例",
+    "level": "行政法规",
+    "url": "https://xzfg.moj.gov.cn/front/law/detail?LawID=339",
+    "effective_date": "2012-02-01",
+    "version": "2019年修订",
+    "expected_count": 84
+  },
+  {
+    "law_name": "建设工程质量管理条例",
+    "level": "行政法规",
+    "url": "https://www.gov.cn/gongbao/content/2019/content_5468867.htm",
+    "effective_date": "2000-01-30",
+    "version": "2019年修正",
+    "expected_count": 82
+  }
+]

@@ -36,29 +36,69 @@ class StatuteHit(BaseModel):
     score: float
 
 
+class SearchResponse(BaseModel):
+    items: list[StatuteHit]
+    total: int
+    terms: list[str]
+
+
+class LawSource(BaseModel):
+    law_name: str
+    level: str
+    version: str | None
+    effective_date: str | None
+    source_url: str
+    fetched_at: str
+    article_count: int
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "environment": os.getenv("APP_ENV", "development")}
 
 
-@app.get("/api/statutes/search", response_model=list[StatuteHit])
+@app.get("/api/statutes/search", response_model=SearchResponse)
 def search_statutes(
     q: str = Query(min_length=1, max_length=200, description="自然语言查询"),
-    limit: int = Query(default=5, ge=1, le=20),
-) -> list[StatuteHit]:
+    limit: int = Query(default=10, ge=1, le=20),
+    offset: int = Query(default=0, ge=0),
+) -> SearchResponse:
     conn = db.connect()
     try:
-        rows = db.search(conn, q, limit)
+        rows, total = db.search(conn, q, limit, offset)
     finally:
         conn.close()
-    return [
-        StatuteHit(
-            law_name=row["law_name"],
-            article_no=row["article_no"],
-            article_index=row["article_index"],
-            text=row["text"],
-            source_url=row["source_url"],
-            score=row["score"],
-        )
-        for row in rows
-    ]
+    return SearchResponse(
+        items=[
+            StatuteHit(
+                law_name=row["law_name"],
+                article_no=row["article_no"],
+                article_index=row["article_index"],
+                text=row["text"],
+                source_url=row["source_url"],
+                score=row["score"],
+            )
+            for row in rows
+        ],
+        total=total,
+        terms=db.query_terms(q),
+    )
+
+
+@app.get("/api/statutes/sources", response_model=list[LawSource])
+def list_sources() -> list[LawSource]:
+    """知识库版本清单：每部法源的版本、生效日、来源与抓取时间。"""
+    conn = db.connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT law_name, level, version, effective_date, source_url,
+                   MAX(fetched_at) AS fetched_at, COUNT(*) AS article_count
+            FROM statutes
+            GROUP BY law_name, level, version, effective_date, source_url
+            ORDER BY law_name
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+    return [LawSource(**dict(row)) for row in rows]

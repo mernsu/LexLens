@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import "./globals.css";
+
 export const metadata: Metadata = {
   title: "LexLens",
   description: "建设工程合同纠纷法律研究工作台",

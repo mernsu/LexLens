@@ -125,11 +125,16 @@ def replace_articles(
     return inserted
 
 
-def search(conn: sqlite3.Connection, query: str, limit: int = 5) -> list[sqlite3.Row]:
-    """先按全词 AND 求精确；无结果再退到 OR，并按命中词数重排。"""
+def search(
+    conn: sqlite3.Connection, query: str, limit: int = 5, offset: int = 0
+) -> tuple[list[sqlite3.Row], int]:
+    """先按全词 AND 求精确；无结果再退到 OR，并按命中词数重排。
+
+    返回 (当前页结果, 总命中数)。
+    """
     words = query_tokens(query)
     if not words:
-        return []
+        return [], 0
     sql = """
         SELECT s.law_name, s.article_no, s.article_index, s.text, s.source_url,
                f.tokens AS indexed_tokens, bm25(statutes_fts) AS score
@@ -137,15 +142,36 @@ def search(conn: sqlite3.Connection, query: str, limit: int = 5) -> list[sqlite3
         JOIN statutes s ON s.id = f.rowid
         WHERE statutes_fts MATCH ?
         ORDER BY score
-        LIMIT ?
+        LIMIT ? OFFSET ?
     """
-    exact = conn.execute(sql, (_expression(words, " "), limit)).fetchall()
-    if exact:
-        return exact
+    count_sql = "SELECT COUNT(*) FROM statutes_fts WHERE statutes_fts MATCH ?"
 
-    candidates = conn.execute(sql, (_expression(words, " OR "), 50)).fetchall()
+    expression = _expression(words, " ")
+    total = conn.execute(count_sql, (expression,)).fetchone()[0]
+    if total:
+        return conn.execute(sql, (expression, limit, offset)).fetchall(), total
+
+    # OR 兜底需要先取候选再按覆盖率排序，分页在内存里切
+    candidates = conn.execute(
+        """
+        SELECT s.law_name, s.article_no, s.article_index, s.text, s.source_url,
+               f.tokens AS indexed_tokens, bm25(statutes_fts) AS score
+        FROM statutes_fts f
+        JOIN statutes s ON s.id = f.rowid
+        WHERE statutes_fts MATCH ?
+        ORDER BY score
+        LIMIT 500
+        """,
+        (_expression(words, " OR "),),
+    ).fetchall()
     ranked = sorted(
         candidates,
         key=lambda row: (-_coverage(row["indexed_tokens"], words), row["score"]),
     )
-    return ranked[:limit]
+    return ranked[offset : offset + limit], len(ranked)
+
+
+def query_terms(query: str) -> list[str]:
+    """查询串里的原始词，供前端高亮使用。"""
+    return [word for word in _TOKEN_RUN.findall(query) if len(word) >= 2]
+
