@@ -58,6 +58,43 @@ export async function fetchContext(
   return (await response.json()) as ContextItem[];
 }
 
+export type JudgmentHit = {
+  case_no: string;
+  court: string;
+  trial_level: string;
+  judgment_date: string | null;
+  cause: string | null;
+  project_type: string | null;
+  dispute_types: string[];
+  cited_statutes: string[];
+  holding: string;
+  reasoning: string | null;
+  source_url: string | null;
+};
+
+export type JudgmentSearchResponse = {
+  items: JudgmentHit[];
+  total: number;
+  terms: string[];
+};
+
+export async function searchJudgments(
+  query: string,
+  limit = 10,
+  offset = 0,
+): Promise<JudgmentSearchResponse> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const response = await fetch(`${API_BASE}/api/judgments/search?${params}`);
+  if (!response.ok) {
+    throw new Error(`类案检索失败：HTTP ${response.status}`);
+  }
+  return (await response.json()) as JudgmentSearchResponse;
+}
+
 export async function searchStatutes(
   query: string,
   limit = 10,

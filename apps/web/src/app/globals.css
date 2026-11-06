@@ -38,6 +38,28 @@ h1 {
   margin: 0 0 28px;
 }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tab-active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+
 .search-form {
   display: flex;
   gap: 8px;
@@ -111,6 +133,34 @@ h1 {
   white-space: pre-wrap;
 }
 
+.result-sub {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: var(--accent);
+  font-size: 12px;
+}
+
 .result-foot {
   margin-top: 10px;
   font-size: 12px;
@@ -120,7 +170,7 @@ h1 {
   gap: 12px;
 }
 
-.result-foot a {
+.result-foot > :first-child {
   margin-right: auto;
 }
 
