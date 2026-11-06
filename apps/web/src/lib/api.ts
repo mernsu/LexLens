@@ -16,6 +16,13 @@ export type SearchResponse = {
   terms: string[];
 };
 
+export type ContextItem = {
+  article_no: string;
+  article_index: number;
+  text: string;
+  is_target: boolean;
+};
+
 export type LawSource = {
   law_name: string;
   level: string;
@@ -32,6 +39,23 @@ export async function fetchSources(): Promise<LawSource[]> {
     throw new Error(`读取清单失败：HTTP ${response.status}`);
   }
   return (await response.json()) as LawSource[];
+}
+
+export async function fetchContext(
+  lawName: string,
+  articleIndex: number,
+  span = 2,
+): Promise<ContextItem[]> {
+  const params = new URLSearchParams({
+    law_name: lawName,
+    article_index: String(articleIndex),
+    span: String(span),
+  });
+  const response = await fetch(`${API_BASE}/api/statutes/context?${params}`);
+  if (!response.ok) {
+    throw new Error(`读取上下文失败：HTTP ${response.status}`);
+  }
+  return (await response.json()) as ContextItem[];
 }
 
 export async function searchStatutes(

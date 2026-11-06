@@ -120,8 +120,11 @@ h1 {
   gap: 12px;
 }
 
+.result-foot a {
+  margin-right: auto;
+}
+
 .copy {
-  margin-left: auto;
   padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -134,6 +137,46 @@ h1 {
 .copy:hover {
   color: var(--text);
   border-color: var(--accent);
+}
+
+.context {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ctx-item {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ctx-item p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.ctx-current {
+  background: #eef4ff;
+  color: var(--text);
+}
+
+.ctx-no {
+  font-weight: 600;
 }
 
 .result-foot a {

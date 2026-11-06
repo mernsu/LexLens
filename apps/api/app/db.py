@@ -175,3 +175,18 @@ def query_terms(query: str) -> list[str]:
     """查询串里的原始词，供前端高亮使用。"""
     return [word for word in _TOKEN_RUN.findall(query) if len(word) >= 2]
 
+
+def articles_around(
+    conn: sqlite3.Connection, law_name: str, article_index: int, span: int
+) -> list[sqlite3.Row]:
+    """取某条及其前后各 span 条，供核验上下文使用。"""
+    return conn.execute(
+        """
+        SELECT article_no, article_index, text
+        FROM statutes
+        WHERE law_name = ? AND article_index BETWEEN ? AND ?
+        ORDER BY article_index
+        """,
+        (law_name, article_index - span, article_index + span),
+    ).fetchall()
+

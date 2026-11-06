@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -40,6 +40,13 @@ class SearchResponse(BaseModel):
     items: list[StatuteHit]
     total: int
     terms: list[str]
+
+
+class ContextItem(BaseModel):
+    article_no: str
+    article_index: int
+    text: str
+    is_target: bool
 
 
 class LawSource(BaseModel):
@@ -83,6 +90,31 @@ def search_statutes(
         total=total,
         terms=db.query_terms(q),
     )
+
+
+@app.get("/api/statutes/context", response_model=list[ContextItem])
+def statute_context(
+    law_name: str = Query(min_length=1, max_length=80),
+    article_index: int = Query(ge=1),
+    span: int = Query(default=2, ge=0, le=5),
+) -> list[ContextItem]:
+    """返回目标条文及其前后文，供引用核验。"""
+    conn = db.connect()
+    try:
+        rows = db.articles_around(conn, law_name, article_index, span)
+    finally:
+        conn.close()
+    if not rows:
+        raise HTTPException(status_code=404, detail="未找到该条文")
+    return [
+        ContextItem(
+            article_no=row["article_no"],
+            article_index=row["article_index"],
+            text=row["text"],
+            is_target=row["article_index"] == article_index,
+        )
+        for row in rows
+    ]
 
 
 @app.get("/api/statutes/sources", response_model=list[LawSource])

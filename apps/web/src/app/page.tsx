@@ -3,10 +3,13 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import {
+  fetchContext,
   fetchSources,
   searchStatutes,
+  type ContextItem,
   type LawSource,
   type SearchResponse,
+  type StatuteHit,
 } from "@/lib/api";
 
 const PAGE_SIZE = 10;
@@ -37,6 +40,7 @@ export default function Home() {
   const [sources, setSources] = useState<LawSource[]>([]);
   const [offset, setOffset] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
+  const [contexts, setContexts] = useState<Record<string, ContextItem[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,13 +71,31 @@ export default function Home() {
     }
   }
 
-  async function copyCitation(key: string, lawName: string, articleNo: string) {
+  async function copyText(key: string, text: string) {
     try {
-      await navigator.clipboard.writeText(`《${lawName}》${articleNo}`);
+      await navigator.clipboard.writeText(text);
       setCopied(key);
       window.setTimeout(() => setCopied(null), 1500);
     } catch {
       setError("复制失败：浏览器拒绝访问剪贴板");
+    }
+  }
+
+  async function toggleContext(hit: StatuteHit) {
+    const key = `${hit.law_name}#${hit.article_index}`;
+    if (contexts[key]) {
+      setContexts((previous) => {
+        const next = { ...previous };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    try {
+      const items = await fetchContext(hit.law_name, hit.article_index);
+      setContexts((previous) => ({ ...previous, [key]: items }));
+    } catch (cause) {
+      setError(String(cause));
     }
   }
 
@@ -117,36 +139,64 @@ export default function Home() {
       )}
 
       <div className="result-list">
-        {result?.items.map((hit) => (
-          <article className="result" key={hit.law_name + hit.article_no}>
-            <div className="result-head">
-              <span className="article">{hit.article_no}</span>
-              <span className="law">{hit.law_name}</span>
-            </div>
-            <p className="result-text">
-              <Highlighted text={hit.text} terms={result.terms} />
-            </p>
-            <p className="result-foot">
-              来源：{" "}
-              <a href={hit.source_url} target="_blank" rel="noreferrer">
-                原文页面
-              </a>
-              <button
-                type="button"
-                className="copy"
-                onClick={() =>
-                  void copyCitation(
-                    hit.law_name + hit.article_no,
-                    hit.law_name,
-                    hit.article_no,
-                  )
-                }
-              >
-                {copied === hit.law_name + hit.article_no ? "已复制" : "复制引用"}
-              </button>
-            </p>
-          </article>
-        ))}
+        {result?.items.map((hit) => {
+          const key = `${hit.law_name}#${hit.article_index}`;
+          const context = contexts[key];
+          return (
+            <article className="result" key={key}>
+              <div className="result-head">
+                <span className="article">{hit.article_no}</span>
+                <span className="law">{hit.law_name}</span>
+              </div>
+              <p className="result-text">
+                <Highlighted text={hit.text} terms={result.terms} />
+              </p>
+              <p className="result-foot">
+                来源：{" "}
+                <a href={hit.source_url} target="_blank" rel="noreferrer">
+                  原文页面
+                </a>
+                <button
+                  type="button"
+                  className="copy"
+                  onClick={() => void toggleContext(hit)}
+                >
+                  {context ? "收起上下文" : "查看上下文"}
+                </button>
+                <button
+                  type="button"
+                  className="copy"
+                  onClick={() => void copyText(key, `《${hit.law_name}》${hit.article_no}`)}
+                >
+                  {copied === key ? "已复制" : "复制引用"}
+                </button>
+              </p>
+              {context && (
+                <div className="context">
+                  <div className="context-head">
+                    <span>前后各 2 条</span>
+                    <button
+                      type="button"
+                      className="copy"
+                      onClick={() => void copyText(`raw:${key}`, hit.text)}
+                    >
+                      {copied === `raw:${key}` ? "已复制" : "复制原文"}
+                    </button>
+                  </div>
+                  {context.map((item) => (
+                    <div
+                      key={item.article_index}
+                      className={item.is_target ? "ctx-item ctx-current" : "ctx-item"}
+                    >
+                      <span className="ctx-no">{item.article_no}</span>
+                      <p>{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          );
+        })}
       </div>
 
       {result && pages > 1 && (
