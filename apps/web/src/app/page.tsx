@@ -3,11 +3,13 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import {
+  analyzeFocus,
   fetchContext,
   fetchSources,
   searchJudgments,
   searchStatutes,
   type ContextItem,
+  type FocusResponse,
   type JudgmentSearchResponse,
   type LawSource,
   type SearchResponse,
@@ -45,12 +47,16 @@ export default function Home() {
   const [contexts, setContexts] = useState<Record<string, ContextItem[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"statute" | "judgment">("statute");
+  const [tab, setTab] = useState<"statute" | "judgment" | "focus">("statute");
   const [judgmentQuery, setJudgmentQuery] = useState("");
   const [judgmentResult, setJudgmentResult] = useState<JudgmentSearchResponse | null>(null);
   const [judgmentOffset, setJudgmentOffset] = useState(0);
   const [judgmentLoading, setJudgmentLoading] = useState(false);
   const [judgmentError, setJudgmentError] = useState<string | null>(null);
+  const [facts, setFacts] = useState("");
+  const [focusResult, setFocusResult] = useState<FocusResponse | null>(null);
+  const [focusLoading, setFocusLoading] = useState(false);
+  const [focusError, setFocusError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSources()
@@ -81,6 +87,18 @@ export default function Home() {
       setJudgmentError(String(cause));
     } finally {
       setJudgmentLoading(false);
+    }
+  }
+
+  async function runFocusAnalysis() {
+    setFocusLoading(true);
+    setFocusError(null);
+    try {
+      setFocusResult(await analyzeFocus(facts.trim()));
+    } catch (cause) {
+      setFocusError(String(cause));
+    } finally {
+      setFocusLoading(false);
     }
   }
 
@@ -135,6 +153,8 @@ export default function Home() {
   const judgmentPages = Math.ceil(judgmentTotal / PAGE_SIZE);
 
   const isStatute = tab === "statute";
+  const isJudgment = tab === "judgment";
+  const isFocus = tab === "focus";
   const activeQuery = isStatute ? query : judgmentQuery;
   const activeLoading = isStatute ? loading : judgmentLoading;
 
@@ -158,14 +178,24 @@ export default function Home() {
         <button
           type="button"
           role="tab"
-          aria-selected={!isStatute}
-          className={isStatute ? "tab" : "tab tab-active"}
+          aria-selected={isJudgment}
+          className={isJudgment ? "tab tab-active" : "tab"}
           onClick={() => setTab("judgment")}
         >
           类案
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isFocus}
+          className={isFocus ? "tab tab-active" : "tab"}
+          onClick={() => setTab("focus")}
+        >
+          争议焦点
+        </button>
       </div>
 
+      {!isFocus && (
       <form className="search-form" onSubmit={handleSubmit}>
         <input
           value={activeQuery}
@@ -185,6 +215,85 @@ export default function Home() {
           {activeLoading ? "检索中…" : "检索"}
         </button>
       </form>
+      )}
+
+      {isFocus && (
+        <>
+          <textarea
+            className="facts"
+            value={facts}
+            onChange={(event) => setFacts(event.target.value)}
+            rows={8}
+            placeholder="输入案情摘要：当事人关系、合同签订与履行、工程阶段、款项支付、质量与工期争议、已有证据…"
+            aria-label="案情摘要"
+          />
+          <div className="focus-actions">
+            <button
+              type="button"
+              disabled={focusLoading || facts.trim().length < 10}
+              onClick={() => void runFocusAnalysis()}
+            >
+              {focusLoading ? "分析中…" : "生成焦点表"}
+            </button>
+            <span className="meta">基于关键词规则初筛，非语义推理</span>
+          </div>
+
+          {focusError && <p className="error">{focusError}</p>}
+
+          {focusResult && focusResult.items.length === 0 && (
+            <p className="hint">
+              未命中任何焦点规则。补充工程类型、款项、验收、工期等关键词后重试。
+            </p>
+          )}
+
+          <div className="result-list">
+            {focusResult?.items.map((item) => (
+              <article className="result" key={item.focus}>
+                <div className="result-head">
+                  <span className="article">{item.focus}</span>
+                  <span className="law">命中：{item.matched_keywords.join("、")}</span>
+                </div>
+                <div className="claims">
+                  {Object.entries(item.claims).map(([side, claim]) => (
+                    <div key={side}>
+                      <strong>{side}</strong>
+                      <p>{claim}</p>
+                    </div>
+                  ))}
+                </div>
+                {item.statutes.length > 0 && (
+                  <div className="tags">
+                    {item.statutes.map((statute) => (
+                      <a
+                        className="tag"
+                        key={statute.law_name + statute.article_no}
+                        href={statute.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {statute.short_name}
+                        {statute.article_no}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                <ul className="evidence">
+                  {item.evidence.map((entry) => (
+                    <li key={entry.item}>
+                      <span className={entry.status === "文中提及" ? "ev ev-ok" : "ev ev-todo"}>
+                        {entry.status}
+                      </span>
+                      {entry.item}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+
+          {focusResult && <p className="meta note">{focusResult.note}</p>}
+        </>
+      )}
 
       {isStatute && (
         <>
@@ -289,7 +398,7 @@ export default function Home() {
         </>
       )}
 
-      {!isStatute && (
+      {isJudgment && (
         <>
           {judgmentError && <p className="error">{judgmentError}</p>}
 

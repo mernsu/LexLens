@@ -161,6 +161,93 @@ h1 {
   font-size: 12px;
 }
 
+.facts {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.focus-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 8px;
+}
+
+.focus-actions button {
+  padding: 8px 18px;
+  border: 1px solid var(--text);
+  border-radius: 6px;
+  background: var(--text);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.focus-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.claims {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.claims strong {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.claims p {
+  margin: 4px 0 0;
+  line-height: 1.7;
+}
+
+.evidence {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.evidence li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.ev {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ev-ok {
+  background: #e6f4ea;
+  color: #1f7a3d;
+}
+
+.ev-todo {
+  background: #fdf0e6;
+  color: #a05a1c;
+}
+
+.note {
+  margin-top: 16px;
+}
+
 .result-foot {
   margin-top: 10px;
   font-size: 12px;

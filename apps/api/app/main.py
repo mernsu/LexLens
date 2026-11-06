@@ -4,9 +4,9 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app import db
+from app import db, focus
 
 load_dotenv()
 
@@ -23,7 +23,7 @@ cors_origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -70,6 +70,36 @@ class JudgmentSearchResponse(BaseModel):
     terms: list[str]
 
 
+class FocusRequest(BaseModel):
+    facts: str = Field(min_length=10, max_length=5000)
+
+
+class FocusStatute(BaseModel):
+    law_name: str
+    short_name: str
+    article_no: str
+    text: str
+    source_url: str
+
+
+class FocusEvidence(BaseModel):
+    item: str
+    status: str
+
+
+class FocusItem(BaseModel):
+    focus: str
+    matched_keywords: list[str]
+    claims: dict[str, str]
+    statutes: list[FocusStatute]
+    evidence: list[FocusEvidence]
+
+
+class FocusResponse(BaseModel):
+    items: list[FocusItem]
+    note: str
+
+
 class LawSource(BaseModel):
     law_name: str
     level: str
@@ -110,6 +140,16 @@ def search_statutes(
         ],
         total=total,
         terms=db.query_terms(q),
+    )
+
+
+@app.post("/api/focus/analyze", response_model=FocusResponse)
+def focus_analyze(payload: FocusRequest) -> FocusResponse:
+    """按规则初筛争议焦点，法条一律回查库内原文。"""
+    items = focus.analyze(payload.facts)
+    return FocusResponse(
+        items=[FocusItem(**item) for item in items],
+        note="规则初筛，非法律意见；焦点取舍、要件与证据判断须由律师复核。",
     )
 
 

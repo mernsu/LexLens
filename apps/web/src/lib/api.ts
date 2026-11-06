@@ -78,6 +78,39 @@ export type JudgmentSearchResponse = {
   terms: string[];
 };
 
+export type FocusStatute = {
+  law_name: string;
+  short_name: string;
+  article_no: string;
+  text: string;
+  source_url: string;
+};
+
+export type FocusItem = {
+  focus: string;
+  matched_keywords: string[];
+  claims: Record<string, string>;
+  statutes: FocusStatute[];
+  evidence: { item: string; status: string }[];
+};
+
+export type FocusResponse = {
+  items: FocusItem[];
+  note: string;
+};
+
+export async function analyzeFocus(facts: string): Promise<FocusResponse> {
+  const response = await fetch(`${API_BASE}/api/focus/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ facts }),
+  });
+  if (!response.ok) {
+    throw new Error(`焦点分析失败：HTTP ${response.status}`);
+  }
+  return (await response.json()) as FocusResponse;
+}
+
 export async function searchJudgments(
   query: string,
   limit = 10,
